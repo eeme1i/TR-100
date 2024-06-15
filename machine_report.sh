@@ -110,9 +110,9 @@ cpu_sockets="$(lscpu | grep 'Socket(s)' | cut -f 2 -d ':' | awk '{$1=$1}1')"
 # cpu_freq="$(grep 'cpu MHz' /proc/cpuinfo | cut -f 2 -d ':' | awk 'NR==1' | awk '{$1=$1}1' | numfmt --from-unit=M --to-unit=G --format %.2f)"
 cpu_freq="$(grep 'cpu MHz' /proc/cpuinfo | cut -f 2 -d ':' | awk 'NR==1 { printf "%.2f", $1 / 1000 }')" # Convert from M to G units
 
-load_avg_1min=$(uptime | awk -F'load average: ' '{print $2}' | cut -d ',' -f1 | tr -d ' ')
-load_avg_5min=$(uptime | awk -F'load average: ' '{print $2}' | cut -d ',' -f2 | tr -d ' ')
-load_avg_15min=$(uptime| awk -F'load average: ' '{print $2}' | cut -d ',' -f3 | tr -d ' ')
+load_avg_1min=$(uptime | awk -F'load average: ' '{print $2}' | cut -d ' ' -f1 | tr -d ' ' | tr , .)
+load_avg_5min=$(uptime | awk -F'load average: ' '{print $2}' | cut -d ' ' -f2 | tr -d ' ' | tr , .)
+load_avg_15min=$(uptime| awk -F'load average: ' '{print $2}' | cut -d ' ' -f3 | tr -d ' ' | tr , .)
 
 cpu_1min_bar_graph=$(bar_graph "$load_avg_1min" "$cpu_cores")
 cpu_5min_bar_graph=$(bar_graph "$load_avg_5min" "$cpu_cores")
@@ -121,16 +121,16 @@ cpu_15min_bar_graph=$(bar_graph "$load_avg_15min" "$cpu_cores")
 # Memory Information
 mem_total=$(grep 'MemTotal' /proc/meminfo | awk '{print $2}')
 mem_available=$(grep 'MemAvailable' /proc/meminfo | awk '{print $2}')
-mem_used=$((mem_total - mem_available))
+mem_used=$(($mem_total - $mem_available))
 mem_percent=$(awk -v used="$mem_used" -v total="$mem_total" 'BEGIN { printf "%.2f", (used / total) * 100 }')
-mem_percent=$(printf "%.2f" "$mem_percent")
+mem_percent=$(printf "$mem_percent")
 mem_total_gb=$(echo "$mem_total" | awk '{ printf "%.2f", $1 / (1024 * 1024) }') # (From Ki to Gi units)
 mem_available_gb=$(echo "$mem_available" | awk '{ printf "%.2f", $1 / (1024 * 1024) }') # (From Ki to Gi units) Not used currently
 mem_used_gb=$(echo "$mem_used" | awk '{ printf "%.2f", $1 / (1024 * 1024) }')
 mem_bar_graph=$(bar_graph "$mem_used" "$mem_total")
 
 # Disk Information
-if [ "$(command -v zfs)" ] && [ "$(grep -q "zfs" /proc/mounts)" ]; then
+if [ "$(command -v zfs)" ] && [ "$(grep -q "zfs" /proc/media)" ]; then
     zfs_present=1
     zfs_health=$(zpool status -x zroot | grep -q "is healthy" && echo  "HEALTH O.K.")
     zfs_available=$(zfs get -o value -Hp available "$zfs_filesystem")
@@ -150,21 +150,21 @@ else
     disk_bar_graph=$(bar_graph "$root_used" "$root_total")
 fi
 
-# Last login and Uptime
-last_login=$(lastlog -u "$USER")
-last_login_ip=$(echo "$last_login" | awk 'NR==2 {print $3}')
+# # Last login and Uptime
+# last_login=$(lastlog -u "$USER")
+# last_login_ip=$(echo "$last_login" | awk 'NR==2 {print $3}')
 
-# Check if last_login_ip is an IP address
-if [[ "$last_login_ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    last_login_ip_present=1
-    last_login_time=$(echo "$last_login" | awk 'NR==2 {print $6, $7, $10, $8}')
-else
-    last_login_time=$(echo "$last_login" | awk 'NR==2 {print $4, $5, $8, $6}')
-    # Check for **Never logged in** edge case
-    if [ "$last_login_time" = "in**" ]; then
-        last_login_time="Never logged in"
-    fi
-fi
+# # Check if last_login_ip is an IP address
+# if [[ "$last_login_ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+#     last_login_ip_present=1
+#     last_login_time=$(echo "$last_login" | awk 'NR==2 {print $6, $7, $10, $8}')
+# else
+#     last_login_time=$(echo "$last_login" | awk 'NR==2 {print $4, $5, $8, $6}')
+#     # Check for **Never logged in** edge case
+#     if [ "$last_login_time" = "in**" ]; then
+#         last_login_time="Never logged in"
+#     fi
+# fi
 
 sys_uptime=$(uptime -p | sed 's/up\s*//; s/\s*day\(s*\)/d/; s/\s*hour\(s*\)/h/; s/\s*minute\(s*\)/m/')
 
@@ -179,7 +179,7 @@ printf "│ %-10s │ %-29s │\n" "KERNEL" "$os_kernel"
 printf "├────────────┼───────────────────────────────┤\n"
 printf "│ %-10s │ %-29s │\n" "HOSTNAME" "$net_hostname"
 printf "│ %-10s │ %-29s │\n" "MACHINE IP" "$net_machine_ip"
-printf "│ %-10s │ %-29s │\n" "CLIENT  IP" "$net_client_ip"
+# printf "│ %-10s │ %-29s │\n" "CLIENT  IP" "$net_client_ip"
 
 # Sometimes we have multiple dns IPs
 for dns_num in "${!net_dns_ip[@]}"; do
@@ -211,7 +211,6 @@ printf "├────────────┼──────────
 printf "│ %-10s │ %-29s │\n" "MEMORY" "${mem_used_gb}/${mem_total_gb} GiB [${mem_percent}%]"
 printf "│ %-10s │ %-29s │\n" "USAGE" "${mem_bar_graph}"
 printf "├────────────┼───────────────────────────────┤\n"
-printf "│ %-10s │ %-29s │\n" "LAST LOGIN" "$last_login_time"
 
 if [ $last_login_ip_present -eq 1 ]; then
     printf "│ %-10s │ %-29s │\n" "" "$last_login_ip"
